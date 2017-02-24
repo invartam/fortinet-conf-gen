@@ -10,7 +10,7 @@
       },
       {
           "type": "vcs",
-          "url": "http://172.20.91.190/OCD/fortinet-php.git"
+          "url": "https://gogs.benjy.lu/benjy/fortinet-php.git"
       }
     ],
     "require": {

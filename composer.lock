@@ -4,15 +4,15 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "hash": "872c06711b1f1b15414fc34017f69e99",
-    "content-hash": "e7819665c862eb83d3d66256b69940b2",
+    "hash": "f834dab0c665f64d94f7565b1b5902bc",
+    "content-hash": "87bbe7c7b1ecb2423769190b557bf7a4",
     "packages": [
         {
             "name": "OCD/fortinet-php",
             "version": "dev-master",
             "source": {
                 "type": "git",
-                "url": "http://172.20.91.190/OCD/fortinet-php.git",
+                "url": "https://gogs.benjy.lu/benjy/fortinet-php.git",
                 "reference": "171d92b5684db758e661288d83a00a24b1b526bb"
             },
             "require-dev": {
