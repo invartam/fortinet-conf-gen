@@ -3,6 +3,7 @@ namespace App\Loader;
 
 use Exception;
 use Fortinet\Fortigate\Address;
+use Fortinet\Fortigate\AddressGroup;
 use Fortinet\Fortigate\NetDevice;
 use Fortinet\Fortigate\Zone;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -20,6 +21,7 @@ class ExcelLoader {
   private $source;
   private $fortigate;
   private $addresses = [];
+  private $addressGroups = [];
   private $interfaces = [];
   private $zones = [];
 
@@ -114,6 +116,25 @@ class ExcelLoader {
     }
   }
 
+  private function parseAddressGroup()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_ADDRESSGROUP);
+    foreach ($sheet->getRowIterator(3) as $row) {
+      $name = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $member = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      if (empty($name) || empty($member)) {
+        break;
+      }
+      if (!array_key_exists($member, $this->addresses)) {
+        throw new Exception("Cannot add non existent address $member in address group $name at row " . $row->getRowIndex(), 1);
+      }
+      if (!array_key_exists($name, $this->addressGroups)) {
+        $this->addressGroups[$name] = new AddressGroup($name);
+      }
+      $this->addressGroups[$name]->addAddress($this->addresses[$member]);
+    }
+  }
+
   private function getFortigate()
   {
     return new Fortigate();
@@ -129,7 +150,7 @@ class ExcelLoader {
     $this->getInfos();
     $this->parseInterfaces();
     $this->parseAddress();
-    // $this->parseAddressGroup();
+    $this->parseAddressGroup();
     // $this->parseService();
     // $this->parseServiceGroup();
     // $this->parsePolicy();
