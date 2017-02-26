@@ -13,7 +13,7 @@
             "source": {
                 "type": "git",
                 "url": "https://gogs.benjy.lu/benjy/fortinet-php.git",
-                "reference": "995f05590eddf9910c5775fb4c20bae69a7f1f30"
+                "reference": "83ada92281e58247462cfd54f1ec3ab3756f1f1c"
             },
             "require-dev": {
                 "phpunit/phpunit": "5.7.*"
@@ -37,7 +37,7 @@
                 }
             ],
             "description": "Fortinet PHP library",
-            "time": "2017-02-26 13:43:44"
+            "time": "2017-02-26 21:54:08"
         },
         {
             "name": "phpoffice/phpspreadsheet",
