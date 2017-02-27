@@ -24,6 +24,24 @@ class ExcelLoader {
 
   private $source;
   private $fortigate;
+  private $policySection;
+
+  public function __construct($file, $vars = [])
+  {
+    if (!file_exists($file)) {
+      throw new Exception("The file $file does not exist", 1);
+    }
+    $this->source = IOFactory::load($file);
+    $this->fortigate = new Fortigate();
+
+    $this->getInfos();
+    $this->parseInterfaces();
+    $this->parseAddress();
+    $this->parseAddressGroup();
+    $this->parseService();
+    $this->parseServiceGroup();
+    $this->parsePolicy($vars);
+  }
 
   private function getInfos()
   {
@@ -198,134 +216,131 @@ class ExcelLoader {
     }
   }
 
-  private function parsePolicy()
+  private function parsePolicyTemplate($tplName, $vars)
+  {
+    if (!array_key_exists($tplName, $this->templates)) {
+      throw new Exception("Policy template $tplName does not exists", 1);
+    }
+    $this->addPolicy($this->templates[$tplName], $vars);
+  }
+
+  private function addPolicy($row, $vars = [])
+  {
+    $id = trim($row->getCellIterator()->seek("B")->current()->getValue());
+    $sourceZone = trim($row->getCellIterator()->seek("C")->current()->getValue());
+    $destinationZone = trim($row->getCellIterator()->seek("D")->current()->getValue());
+    $sourceAddress = trim($row->getCellIterator()->seek("E")->current()->getValue());
+    $destinationAddress = trim($row->getCellIterator()->seek("F")->current()->getValue());
+    $service = trim($row->getCellIterator()->seek("G")->current()->getValue());
+    $action = trim($row->getCellIterator()->seek("H")->current()->getValue());
+    $log = trim($row->getCellIterator()->seek("I")->current()->getValue());
+    $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
+    $nat = trim($row->getCellIterator()->seek("K")->current()->getValue());
+    $desc = trim($row->getCellIterator()->seek("L")->current()->getValue());
+    if (!is_numeric($id) && empty($sourceZone)) {
+      $this->policySection = $id;
+      return;
+    }
+    if (preg_match("/Template/", $desc) && empty($vars)) {
+      $tplName = explode(" ", $desc)[1];
+      $this->templates[$tplName] = $row;
+      return;
+    }
+    $policy = new Policy();
+    foreach (explode(" ", $sourceZone) as $zone) {
+      if (array_key_exists($zone, $this->fortigate->zones)) {
+        $policy->addSrcInterface($this->fortigate->zones[$zone]);
+      }
+      elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
+        $policy->addSrcInterface($this->fortigate->interfaces[$zone]);
+      }
+      else {
+        throw new Exception("Source zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
+      }
+    }
+    foreach (explode(" ", $destinationZone) as $zone) {
+      if (array_key_exists($zone, $this->fortigate->zones)) {
+        $policy->addDstInterface($this->fortigate->zones[$zone]);
+      }
+      elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
+        $policy->addDstInterface($this->fortigate->interfaces[$zone]);
+      }
+      else {
+        throw new Exception("Destination zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
+      }
+    }
+    if (empty($sourceAddress) || $sourceAddress == "all") {
+      $policy->addSrcAddress(Address::ALL());
+    }
+    else {
+      foreach (explode(" ", $sourceAddress) as $address) {
+        if (array_key_exists($address, $this->fortigate->addressGroups)) {
+          $policy->addSrcAddress($this->fortigate->addressGroups[$address]);
+        }
+        elseif (array_key_exists($address, $this->fortigate->addresses)) {
+          $policy->addSrcAddress($this->fortigate->addresses[$address]);
+        }
+        else {
+          throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
+        }
+      }
+    }
+    if (empty($destinationAddress) || $destinationAddress == "all") {
+      $policy->addDstAddress(Address::ALL());
+    }
+    else {
+      foreach (explode(" ", $destinationAddress) as $address) {
+        if (array_key_exists($address, $this->fortigate->addressGroups)) {
+          $policy->addDstAddress($this->fortigate->addressGroups[$address]);
+        }
+        elseif (array_key_exists($address, $this->fortigate->addresses)) {
+          $policy->addDstAddress($this->fortigate->adresses[$address]);
+        }
+        else {
+          throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
+        }
+      }
+    }
+    if (empty($service) || $service == "all") {
+      $policy->addService(Service::ALL());
+    }
+    else {
+      foreach (explode(" ", $service) as $svc) {
+        if (array_key_exists($svc, $this->fortigate->serviceGroups)) {
+          $policy->addService($this->fortigate->serviceGroups[$svc]);
+        }
+        elseif (array_key_exists($svc, $this->fortigate->services)) {
+          $policy->addService($this->fortigate->services[$svc]);
+        }
+        else {
+          throw new Exception("Sservice or service group $svc does not exist at row " . $row->getRowIndex(), 1);
+        }
+      }
+    }
+    if ($action == "allow" || empty($action)){
+      $policy->setAction("accept");
+    }
+    else {
+      $policy->setAction("deny");
+    }
+    if (!empty($nat)) {
+      $policy->doNat();
+    }
+    $policy->setGlobalLabel($this->policySection);
+    $this->fortigate->addPolicy($policy);
+  }
+
+  private function parsePolicy($vars = [])
   {
     $sheet = $this->source->getSheetByName(self::TAB_POLICY);
-    $section = "";
+    $this->policySection = "";
     foreach ($sheet->getRowIterator(3) as $row) {
-      $id = trim($row->getCellIterator()->seek("B")->current()->getValue());
-      $sourceZone = trim($row->getCellIterator()->seek("C")->current()->getValue());
-      $destinationZone = trim($row->getCellIterator()->seek("D")->current()->getValue());
-      $sourceAddress = trim($row->getCellIterator()->seek("E")->current()->getValue());
-      $destinationAddress = trim($row->getCellIterator()->seek("F")->current()->getValue());
-      $service = trim($row->getCellIterator()->seek("G")->current()->getValue());
-      $action = trim($row->getCellIterator()->seek("H")->current()->getValue());
-      $log = trim($row->getCellIterator()->seek("I")->current()->getValue());
-      $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
-      $nat = trim($row->getCellIterator()->seek("K")->current()->getValue());
-      $desc = trim($row->getCellIterator()->seek("L")->current()->getValue());
-      if (!is_numeric($id) && empty($sourceZone)) {
-        $section = $id;
-        continue;
-      }
-      if ($desc == "Template") {
-        continue;
-      }
-      $policy = new Policy();
-      foreach (explode(" ", $sourceZone) as $zone) {
-        if (array_key_exists($zone, $this->fortigate->zones)) {
-          $policy->addSrcInterface($this->fortigate->zones[$zone]);
-        }
-        elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
-          $policy->addSrcInterface($this->fortigate->interfaces[$zone]);
-        }
-        else {
-          throw new Exception("Source zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
-        }
-      }
-      foreach (explode(" ", $destinationZone) as $zone) {
-        if (array_key_exists($zone, $this->fortigate->zones)) {
-          $policy->addDstInterface($this->fortigate->zones[$zone]);
-        }
-        elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
-          $policy->addDstInterface($this->fortigate->interfaces[$zone]);
-        }
-        else {
-          throw new Exception("Destination zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
-        }
-      }
-      if (empty($sourceAddress) || $sourceAddress == "all") {
-        $policy->addSrcAddress(Address::ALL());
-      }
-      else {
-        foreach (explode(" ", $sourceAddress) as $address) {
-          if (array_key_exists($address, $this->fortigate->addressGroups)) {
-            $policy->addSrcAddress($this->fortigate->addressGroups[$address]);
-          }
-          elseif (array_key_exists($address, $this->fortigate->addresses)) {
-            $policy->addSrcAddress($this->fortigate->addresses[$address]);
-          }
-          else {
-            throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
-          }
-        }
-      }
-      if (empty($destinationAddress) || $destinationAddress == "all") {
-        $policy->addDstAddress(Address::ALL());
-      }
-      else {
-        foreach (explode(" ", $destinationAddress) as $address) {
-          if (array_key_exists($address, $this->fortigate->addressGroups)) {
-            $policy->addDstAddress($this->fortigate->addressGroups[$address]);
-          }
-          elseif (array_key_exists($address, $this->fortigate->addresses)) {
-            $policy->addDstAddress($this->fortigate->adresses[$address]);
-          }
-          else {
-            throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
-          }
-        }
-      }
-      if (empty($service) || $service == "all") {
-        $policy->addService(Service::ALL());
-      }
-      else {
-        foreach (explode(" ", $service) as $svc) {
-          if (array_key_exists($svc, $this->fortigate->serviceGroups)) {
-            $policy->addService($this->fortigate->serviceGroups[$svc]);
-          }
-          elseif (array_key_exists($svc, $this->fortigate->services)) {
-            $policy->addService($this->fortigate->services[$svc]);
-          }
-          else {
-            throw new Exception("Sservice or service group $svc does not exist at row " . $row->getRowIndex(), 1);
-          }
-        }
-      }
-      if ($action == "allow" || empty($action)){
-        $policy->setAction("accept");
-      }
-      else {
-        $policy->setAction("deny");
-      }
-      if (!empty($nat)) {
-        $policy->doNat();
-      }
-      $policy->setGlobalLabel($section);
-      $this->fortigate->addPolicy($policy);
+      $this->addPolicy($row);
     }
   }
 
-  private function getFortigate()
+  public function getFortigate()
   {
     return $this->fortigate;
-  }
-
-  public function __construct($file)
-  {
-    if (!file_exists($file)) {
-      throw new Exception("The file $file does not exist", 1);
-    }
-    $this->source = IOFactory::load($file);
-    $this->fortigate = new Fortigate();
-
-    $this->getInfos();
-    $this->parseInterfaces();
-    $this->parseAddress();
-    $this->parseAddressGroup();
-    $this->parseService();
-    $this->parseServiceGroup();
-    $this->parsePolicy();
-    print $this->fortigate;
   }
 }
