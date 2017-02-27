@@ -216,15 +216,35 @@ class ExcelLoader {
     }
   }
 
-  private function parsePolicyTemplate($tplName, $vars)
+  public function parsePolicyTemplate($tplName, $vars, $section = "")
   {
     if (!array_key_exists($tplName, $this->templates)) {
       throw new Exception("Policy template $tplName does not exists", 1);
     }
-    $this->addPolicy($this->templates[$tplName], $vars);
+    if (!empty($section)) {
+      $this->policySection = $section;
+    }
+    foreach ($this->templates[$tplName] as $row) {
+      $this->addPolicy($row, true, $vars);
+    }
   }
 
-  private function addPolicy($row, $vars = [])
+  private function parseVar($str, $vars)
+  {
+    if (empty($vars)) {
+      return $str;
+    }
+    $result = [];
+    if (preg_match("/{(.*)}/" , $str, $result)) {
+      if (!array_key_exists($result[1], $vars)) {
+        throw new Exception("The variable $result[1] is not defined", 1);
+      }
+      return $vars[$result[1]];
+    }
+    return $str;
+  }
+
+  private function addPolicy($row, $tpl = false, $vars = [])
   {
     $id = trim($row->getCellIterator()->seek("B")->current()->getValue());
     $sourceZone = trim($row->getCellIterator()->seek("C")->current()->getValue());
@@ -243,11 +263,12 @@ class ExcelLoader {
     }
     if (preg_match("/Template/", $desc) && empty($vars)) {
       $tplName = explode(" ", $desc)[1];
-      $this->templates[$tplName] = $row;
+      $this->templates[$tplName][] = $row;
       return;
     }
     $policy = new Policy();
     foreach (explode(" ", $sourceZone) as $zone) {
+      $zone = $this->parseVar($zone, $vars);
       if (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addSrcInterface($this->fortigate->zones[$zone]);
       }
@@ -259,6 +280,7 @@ class ExcelLoader {
       }
     }
     foreach (explode(" ", $destinationZone) as $zone) {
+      $zone = $this->parseVar($zone, $vars);
       if (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addDstInterface($this->fortigate->zones[$zone]);
       }
@@ -274,6 +296,7 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $sourceAddress) as $address) {
+        $address = $this->parseVar($address, $vars);
         if (array_key_exists($address, $this->fortigate->addressGroups)) {
           $policy->addSrcAddress($this->fortigate->addressGroups[$address]);
         }
@@ -290,11 +313,12 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $destinationAddress) as $address) {
+        $address = $this->parseVar($address, $vars);
         if (array_key_exists($address, $this->fortigate->addressGroups)) {
           $policy->addDstAddress($this->fortigate->addressGroups[$address]);
         }
         elseif (array_key_exists($address, $this->fortigate->addresses)) {
-          $policy->addDstAddress($this->fortigate->adresses[$address]);
+          $policy->addDstAddress($this->fortigate->addresses[$address]);
         }
         else {
           throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
@@ -306,6 +330,7 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $service) as $svc) {
+        $svc = $this->parseVar($svc, $vars);
         if (array_key_exists($svc, $this->fortigate->serviceGroups)) {
           $policy->addService($this->fortigate->serviceGroups[$svc]);
         }

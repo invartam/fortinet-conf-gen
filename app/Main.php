@@ -12,6 +12,5 @@ class Main {
       throw new Exception("You must give 1 argument : name of the excel file to load", 1);
     }
     $importedConf = new ExcelLoader($argv[1]);
-    // print $importedConf->getFortigate();
   }
 }
