@@ -6,13 +6,13 @@ use App\Model\GetOverload;
 
 class Subnet extends GetOverload {
 
-  const TYPE_NET = 0
+  const TYPE_NET = 0;
   const TYPE_HOST = 1;
 
-  private $name = "";
-  private $netip = "";
-  private $mask = "";
-  private $type = self::TYPE_HOST;
+  protected $name = "";
+  protected $netip = "";
+  protected $mask = "";
+  protected $type = self::TYPE_HOST;
 
   public function __construct($name, $netip, $mask)
   {

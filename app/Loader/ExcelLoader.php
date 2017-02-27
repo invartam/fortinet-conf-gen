@@ -34,7 +34,7 @@ class ExcelLoader {
     $this->source = IOFactory::load($file);
     $this->fortigate = new Fortigate();
 
-    $this->getInfos();
+    // $this->getInfos();
     $this->parseInterfaces();
     $this->parseAddress();
     $this->parseAddressGroup();
@@ -235,11 +235,14 @@ class ExcelLoader {
       return $str;
     }
     $result = [];
-    if (preg_match("/{(.*)}/" , $str, $result)) {
-      if (!array_key_exists($result[1], $vars)) {
-        throw new Exception("The variable $result[1] is not defined", 1);
+    if (preg_match_all("/{(\w+)}/" , $str, $result)) {
+      $str = "";
+      foreach ($result[1] as $value) {
+        if (!array_key_exists($value, $vars)) {
+          throw new Exception("The variable $value is not defined", 1);
+        }
+        $str .= $vars[$value] . " ";
       }
-      return $vars[$result[1]];
     }
     return $str;
   }
@@ -247,11 +250,11 @@ class ExcelLoader {
   private function addPolicy($row, $tpl = false, $vars = [])
   {
     $id = trim($row->getCellIterator()->seek("B")->current()->getValue());
-    $sourceZone = trim($row->getCellIterator()->seek("C")->current()->getValue());
-    $destinationZone = trim($row->getCellIterator()->seek("D")->current()->getValue());
-    $sourceAddress = trim($row->getCellIterator()->seek("E")->current()->getValue());
-    $destinationAddress = trim($row->getCellIterator()->seek("F")->current()->getValue());
-    $service = trim($row->getCellIterator()->seek("G")->current()->getValue());
+    $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("C")->current()->getValue(), $vars));
+    $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
+    $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
+    $destinationAddress = trim($this->parseVar($row->getCellIterator()->seek("F")->current()->getValue(), $vars));
+    $service = trim($this->parseVar($row->getCellIterator()->seek("G")->current()->getValue(), $vars));
     $action = trim($row->getCellIterator()->seek("H")->current()->getValue());
     $log = trim($row->getCellIterator()->seek("I")->current()->getValue());
     $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
@@ -268,7 +271,6 @@ class ExcelLoader {
     }
     $policy = new Policy();
     foreach (explode(" ", $sourceZone) as $zone) {
-      $zone = $this->parseVar($zone, $vars);
       if (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addSrcInterface($this->fortigate->zones[$zone]);
       }
@@ -280,7 +282,6 @@ class ExcelLoader {
       }
     }
     foreach (explode(" ", $destinationZone) as $zone) {
-      $zone = $this->parseVar($zone, $vars);
       if (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addDstInterface($this->fortigate->zones[$zone]);
       }
@@ -296,7 +297,6 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $sourceAddress) as $address) {
-        $address = $this->parseVar($address, $vars);
         if (array_key_exists($address, $this->fortigate->addressGroups)) {
           $policy->addSrcAddress($this->fortigate->addressGroups[$address]);
         }
@@ -313,7 +313,6 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $destinationAddress) as $address) {
-        $address = $this->parseVar($address, $vars);
         if (array_key_exists($address, $this->fortigate->addressGroups)) {
           $policy->addDstAddress($this->fortigate->addressGroups[$address]);
         }
@@ -330,7 +329,6 @@ class ExcelLoader {
     }
     else {
       foreach (explode(" ", $service) as $svc) {
-        $svc = $this->parseVar($svc, $vars);
         if (array_key_exists($svc, $this->fortigate->serviceGroups)) {
           $policy->addService($this->fortigate->serviceGroups[$svc]);
         }
