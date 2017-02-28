@@ -3,27 +3,23 @@ namespace App\Model;
 
 use Exception;
 use App\Model\Subnet;
-use App\Model\Site;
+use App\Model\GetOverload;
 
-class School extends Site {
+class School extends GetOverload {
 
-  const OFFSET_SRV = array("SCCM" => 2,
-                           "AD" => 3,
-                           "FILES" => 4,
-                           "HORUS" => 5
-                         );
+  protected $name = "";
+  protected $subnets = [];
 
-  public function generateServersIP()
+  public function __construct($name)
   {
-    if (!array_key_exists("VRF_Serveurs", $this->subnets)) {
-      throw new Exception("No servers zone has been registered", 1);
+    $this->name = $name;
+  }
+
+  public function addSubnet($vrf, Subnet $subnet)
+  {
+    if (array_key_exists($vrf, $this->subnets) && array_key_exists($subnet->name, $this->subnets[$vrf])) {
+      throw new Exception("The subnet $subnet->name is already registered", 1);
     }
-    $subnet = $this->subnets["VRF_Serveurs"];
-    $ip = explode(".", $subnet->netip);
-    foreach (self::OFFSET_SRV as $name => $offset) {
-      $ip[3] = $ip[3] + $offset;
-      $srvip = implode(".", $ip);
-      $this->addSubnet(new Subnet("SRV_" . $name, $srvip, "255.255.255.255"));
-    }
+    $this->subnets[$vrf][$subnet->name] = $subnet;
   }
 }
