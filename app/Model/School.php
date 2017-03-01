@@ -22,4 +22,15 @@ class School extends GetOverload {
     }
     $this->subnets[$vrf][$subnet->name] = $subnet;
   }
+
+  private function calculateIP($vrf, $subnet, $hostOffset)
+  {
+    if (!array_key_exists($vrf, $this->subnets) && !array_key_exists($subnet, $this->subnet[$vrf])){
+      throw new Exception("VRF $vrf or subnet $subnet does not exists in school $this->name", 1);
+    }
+    $net = $this->subnets[$vrf][$subnet]->netip;
+    $chunks = explode(".", $net);
+    $chunks[3] += $hostOffset;
+    return(implode(".", $chunks));
+  }
 }

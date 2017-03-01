@@ -10,6 +10,7 @@ class SchoolLoader {
 
   private $source;
   private $schools = [];
+  private $servers = [];
 
   public function __construct($file)
   {
@@ -18,6 +19,7 @@ class SchoolLoader {
     }
     $this->source = IOFactory::load($file);
     $this->parseSchool();
+    $this->parseServers();
   }
 
   private function parseSchool()
@@ -41,13 +43,45 @@ class SchoolLoader {
       }
       $this->schools[$shortName]->addSubnet($vrfName, new Subnet($netName, $netAddr, $netMask));
     }
-    // foreach ($this->schools as $key => $value) {
-    //   print "$key\n";
-    // }
+  }
+
+  public function parseServers()
+  {
+    $sheet = $this->source->getSheetByName("Servers");
+    foreach ($sheet->getRowIterator(2) as $row) {
+      $name = trim($row->getCellIterator()->seek("A")->current()->getValue());
+      if (empty($name)) {
+        break;
+      }
+      $vrfName = trim($row->getCellIterator()->seek("B")->current()->getCalculatedValue());
+      $netName = trim($row->getCellIterator()->seek("C")->current()->getCalculatedValue());
+      $startOffset = trim($row->getCellIterator()->seek("D")->current()->getCalculatedValue());
+      $endOffset = trim($row->getCellIterator()->seek("E")->current()->getCalculatedValue());
+      foreach ($this->schools as $schoolName => $school) {
+        $serverName = "H-$schoolName-$name";
+        $chunks = explode(".", $school->subnets[$vrfName][$netName]->netip);
+        $chunks[3] += $startOffset;
+        $serverAddr = implode(".", $chunks);
+        if (empty($endOffset)) {
+          $server = new Subnet($serverName, $serverAddr);
+        }
+        else {
+          $chunks[3] += ($endOffset - $startOffset);
+          $serverEndAddr = implode(".", $chunks);
+          $server = new Subnet($serverName, $serverAddr, $serverEndAddr, Subnet::TYPE_RANGE);
+        }
+        $this->servers[$name][$server->name] = $server;
+      }
+    }
   }
 
   public function getSchools()
   {
     return $this->schools;
+  }
+
+  public function getServers()
+  {
+    return $this->servers;
   }
 }

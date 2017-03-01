@@ -4,6 +4,7 @@ namespace App\Loader;
 use Exception;
 use Fortinet\Fortigate\Fortigate;
 use Fortinet\Fortigate\NetDevice;
+use Fortinet\Fortigate\VPN;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
 use Fortinet\Fortigate\Service;
@@ -21,6 +22,7 @@ class ExcelLoader {
   const TAB_SERVICE = "Services";
   const TAB_SERVICEGROUP = "ServicesGroup";
   const TAB_POLICY = "Policies";
+  const TAB_VPN = "VPN IPSec";
 
   private $source;
   private $fortigate;
@@ -36,6 +38,7 @@ class ExcelLoader {
 
     // $this->getInfos();
     $this->parseInterfaces();
+    $this->parseVPN();
     $this->parseAddress();
     $this->parseAddressGroup();
     $this->parseService();
@@ -117,6 +120,21 @@ class ExcelLoader {
         $this->fortigate->zones[$zone]->addInterface($if);
       }
       $this->fortigate->addNetDevice($if);
+    }
+  }
+
+  private function parseVPN()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_VPN);
+    foreach ($sheet->getRowIterator(3) as $row) {
+      $name = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      if (empty($name)) {
+        break;
+      }
+      if (array_key_exists($name, $this->fortigate->VPNs)) {
+        throw new Exception("Duplicate VPN $name at row " . $row->getRowIndex(), 1);
+      }
+      $this->fortigate->addVPN(new VPN($name));
     }
   }
 
@@ -225,7 +243,7 @@ class ExcelLoader {
       $this->policySection = $section;
     }
     foreach ($this->templates[$tplName] as $row) {
-      $this->addPolicy($row, true, $vars);
+      $this->addPolicy($row, $vars);
     }
   }
 
@@ -247,9 +265,9 @@ class ExcelLoader {
     return $str;
   }
 
-  private function addPolicy($row, $tpl = false, $vars = [])
+  private function addPolicy($row, $vars = [])
   {
-    $id = trim($row->getCellIterator()->seek("B")->current()->getValue());
+    $ignore = trim($row->getCellIterator()->seek("B")->current()->getValue());
     $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("C")->current()->getValue(), $vars));
     $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
     $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
@@ -260,8 +278,11 @@ class ExcelLoader {
     $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
     $nat = trim($row->getCellIterator()->seek("K")->current()->getValue());
     $desc = trim($row->getCellIterator()->seek("L")->current()->getValue());
-    if (!is_numeric($id) && empty($sourceZone)) {
-      $this->policySection = $id;
+    if (!is_numeric($ignore) && empty($sourceZone)) {
+      $this->policySection = $ignore;
+      return;
+    }
+    if (!empty($ignore)) {
       return;
     }
     if (preg_match("/Template/", $desc) && empty($vars)) {
@@ -271,22 +292,34 @@ class ExcelLoader {
     }
     $policy = new Policy();
     foreach (explode(" ", $sourceZone) as $zone) {
-      if (array_key_exists($zone, $this->fortigate->zones)) {
+      if ($zone == "all") {
+        $policy->addSrcInterface(NetDevice::ANY());
+      }
+      elseif (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addSrcInterface($this->fortigate->zones[$zone]);
       }
       elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
         $policy->addSrcInterface($this->fortigate->interfaces[$zone]);
+      }
+      elseif (array_key_exists($zone, $this->fortigate->VPNs)) {
+        $policy->addSrcInterface($this->fortigate->VPNs[$zone]);
       }
       else {
         throw new Exception("Source zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
       }
     }
     foreach (explode(" ", $destinationZone) as $zone) {
-      if (array_key_exists($zone, $this->fortigate->zones)) {
+      if ($zone == "all") {
+        $policy->addDstInterface(NetDevice::ANY());
+      }
+      elseif (array_key_exists($zone, $this->fortigate->zones)) {
         $policy->addDstInterface($this->fortigate->zones[$zone]);
       }
       elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
         $policy->addDstInterface($this->fortigate->interfaces[$zone]);
+      }
+      elseif (array_key_exists($zone, $this->fortigate->VPNs)) {
+        $policy->addDstInterface($this->fortigate->VPNs[$zone]);
       }
       else {
         throw new Exception("Destination zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);

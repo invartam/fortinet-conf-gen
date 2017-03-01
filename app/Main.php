@@ -4,6 +4,7 @@ namespace App;
 use Exception;
 use App\Loader\ExcelLoader;
 use App\Loader\SchoolLoader;
+use App\Model\Subnet;
 use Fortinet\Fortigate\Fortigate;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
@@ -41,19 +42,49 @@ class Main {
       }
       $fgt->addAddressGroup($addrgrp);
     }
-    print $fgt;
+  }
+
+  private static function registerSchoolServers(SchoolLoader $schoolList, Fortigate $fgt)
+  {
+    foreach ($schoolList->getServers() as $type => $servers) {
+      $grpname = "GN-COL-$type";
+      if (!array_key_exists($grpname, $fgt->addressGroups)) {
+        $fgt->addAddressGroup(new AddressGroup($grpname));
+      }
+      foreach ($servers as $name => $server) {
+        if (array_key_exists($name, $fgt->addresses)) {
+          throw new Exception("Server $name is already registered", 1);
+        }
+        $address = new Address($name, $server->netip, $server->mask, $server->type == Subnet::TYPE_RANGE);
+        $fgt->addAddress($address);
+        $fgt->addressGroups[$grpname]->addAddress($address);
+      }
+    }
+  }
+
+  private static function loadVars($file)
+  {
+    $vars = [];
+    $lines = file($file);
+    foreach ($lines as $line) {
+      $var = explode(" = ", $line);
+      $vars[trim($var[0])] = trim($var[1]);
+    }
+    return $vars;
   }
 
   public static function run($argv, $argc)
   {
-    if ($argc != 2) {
-      throw new Exception("You must give 2 arguments : name of the excel file containing base configuration and name of the excel file containing sites list", 1);
+    if ($argc != 3) {
+      print("Usage: $argv[0] <excel conf file> <site list file> <vars file>");
+      exit;
     }
     $importedConf = new ExcelLoader($argv[1]);
-    // $vars = ["NET_PEDAGO" => "N-DMZ_MAINTENANCE"];
-    // $importedConf->parsePolicyTemplate("college", $vars);
     $siteList = new SchoolLoader($argv[2]);
+    $vars = self::loadVars($argv[3]);
     self::registerSchoolSubnets($siteList, $importedConf->getFortigate());
-    // print $importedConf->getFortigate();
+    self::registerSchoolServers($siteList, $importedConf->getFortigate());
+    $importedConf->parsePolicyTemplate("college", $vars, "FLUX COLLEGES");
+    print $importedConf->getFortigate();
   }
 }
