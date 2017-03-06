@@ -8,6 +8,7 @@ use App\Model\Subnet;
 use Fortinet\Fortigate\Fortigate;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
+use phpseclib\Net\SSH2;
 
 class Main {
 
@@ -79,11 +80,17 @@ class Main {
       print("Usage: $argv[0] <excel conf file> <site list file> <vars file>");
       exit;
     }
+    // print "[INFO] Parsing global configuration excel file\n";
     $importedConf = new ExcelLoader($argv[1]);
+    // print "[INFO] Parsing school list excel file\n";
     $siteList = new SchoolLoader($argv[2]);
+    // print "[INFO] Parsing variables file\n";
     $vars = self::loadVars($argv[3]);
+    // print "[INFO] Generating school subnets\n";
     self::registerSchoolSubnets($siteList, $importedConf->getFortigate());
+    // print "[INFO] Generating schools servers IP\n";
     self::registerSchoolServers($siteList, $importedConf->getFortigate());
+    // print "[INFO] Parsing policy templates\n";
     $importedConf->parsePolicyTemplate("college", $vars, "FLUX COLLEGES");
     print $importedConf->getFortigate();
   }

@@ -28,7 +28,7 @@ class ExcelLoader {
   private $fortigate;
   private $policySection;
 
-  public function __construct($file, $vars = [])
+  public function __construct($file)
   {
     if (!file_exists($file)) {
       throw new Exception("The file $file does not exist", 1);
@@ -43,7 +43,7 @@ class ExcelLoader {
     $this->parseAddressGroup();
     $this->parseService();
     $this->parseServiceGroup();
-    $this->parsePolicy($vars);
+    $this->parsePolicy();
   }
 
   private function getInfos()
@@ -386,7 +386,7 @@ class ExcelLoader {
     $this->fortigate->addPolicy($policy);
   }
 
-  private function parsePolicy($vars = [])
+  private function parsePolicy()
   {
     $sheet = $this->source->getSheetByName(self::TAB_POLICY);
     $this->policySection = "";

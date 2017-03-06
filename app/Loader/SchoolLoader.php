@@ -22,13 +22,16 @@ class SchoolLoader {
     $this->parseServers();
   }
 
-  private function parseSchool()
+  private function parseSchool($school = "")
   {
     $sheet = $this->source->getSheet();
     foreach ($sheet->getRowIterator(2) as $row) {
       $name = trim($row->getCellIterator()->seek("A")->current()->getValue());
       if (empty($name)) {
         break;
+      }
+      if (!empty($school) && !preg_match("/$school/", $name)) {
+        continue;
       }
       $vrfName = trim($row->getCellIterator()->seek("B")->current()->getCalculatedValue());
       if (!preg_match("/VRF_/", $vrfName) && !preg_match("/DMZ_/", $vrfName)) {
@@ -38,6 +41,18 @@ class SchoolLoader {
       $netAddr = trim($row->getCellIterator()->seek("F")->current()->getValue());
       $netMask = trim($row->getCellIterator()->seek("K")->current()->getValue());
       $shortName = trim($row->getCellIterator()->seek("M")->current()->getValue());
+      $ips = [$netAddr, $netMask];
+      foreach ($ips as $ip) {
+        $chunks = explode(".", $ip);
+        if (count($chunks) != 4) {
+          throw new Exception("IP $ip does not contain 4 bytes at row " . $row->getRowIndex(), 1);
+        }
+        foreach ($chunks as $byte) {
+          if ($byte > 255) {
+            throw new Exception("IP $ip is not valid at row " . $row->getRowIndex(), 1);
+          }
+        }
+      }
       if (!array_key_exists($shortName, $this->schools)) {
         $this->schools[$shortName] = new School($shortName);
       }
@@ -60,13 +75,22 @@ class SchoolLoader {
       foreach ($this->schools as $schoolName => $school) {
         $serverName = "H-$schoolName-$name";
         $chunks = explode(".", $school->subnets[$vrfName][$netName]->netip);
+        if (count($chunks) != 4) {
+          throw new Exception("IP is not valid at row " . $row->getRowIndex(), 1);
+        }
         $chunks[3] += $startOffset;
+        if ($chunks[3] >= 255) {
+          throw new Exception("IP is not valid at row " . $row->getRowIndex(), 1);
+        }
         $serverAddr = implode(".", $chunks);
         if (empty($endOffset)) {
           $server = new Subnet($serverName, $serverAddr);
         }
         else {
           $chunks[3] += ($endOffset - $startOffset);
+          if ($chunks[3] >= 255) {
+            throw new Exception("IP is not valid at row " . $row->getRowIndex(), 1);
+          }
           $serverEndAddr = implode(".", $chunks);
           $server = new Subnet($serverName, $serverAddr, $serverEndAddr, Subnet::TYPE_RANGE);
         }
