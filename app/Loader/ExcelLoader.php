@@ -231,7 +231,7 @@ class ExcelLoader {
         break;
       }
       $l4proto = "";
-      $l3proto = Service::PROTO_IP;;
+      $l3proto = Service::PROTO_L4;
       if ($proto == "UDP") {
         $l4proto = Service::L4_UDP;
       }
