@@ -7,6 +7,7 @@ use Fortinet\Fortigate\NetDevice;
 use Fortinet\Fortigate\VPN;
 use Fortinet\Fortigate\VIP;
 use Fortinet\Fortigate\IPPool;
+use Fortinet\Fortigate\Route;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
 use Fortinet\Fortigate\Service;
@@ -27,6 +28,7 @@ class ExcelLoader {
   const TAB_VPN = "VPN IPSec";
   const TAB_VIP = "VIP";
   const TAB_IPPOOL = "IP Pool";
+  const TAB_ROUTES = "Routage Statique";
 
   private $source;
   private $fortigate;
@@ -43,6 +45,7 @@ class ExcelLoader {
     // $this->getInfos();
     $this->parseInterfaces();
     $this->parseVPN();
+    $this->parseStaticRoute();
     $this->parseVIP();
     $this->parseIPPool();
     $this->parseAddress();
@@ -125,6 +128,7 @@ class ExcelLoader {
       if (!empty($zone)) {
         $this->fortigate->zones[$zone]->addInterface($if);
       }
+      $if->addAccess(NetDevice::ACCESS_PING);
       $this->fortigate->addNetDevice($if);
     }
   }
@@ -441,6 +445,25 @@ class ExcelLoader {
     }
     $policy->setGlobalLabel($this->policySection);
     $this->fortigate->addPolicy($policy);
+  }
+
+  private function parseStaticRoute()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_ROUTES);
+    foreach ($sheet->getRowIterator(4) as $row) {
+      $ip = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $mask = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $gw = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      $if = trim($row->getCellIterator()->seek("E")->current()->getValue());
+      if (empty($ip) || empty($mask)) {
+        break;
+      }
+      if (!array_key_exists($if, $this->fortigate->interfaces)
+          && !array_key_exists($if, $this->fortigate->VPNs)) {
+        throw new Exception("Interface $if non existent at row " . $row->getRowIndex(), 1);
+      }
+      $this->fortigate->addRoute(new Route($ip, $mask, $if, $gw));
+    }
   }
 
   private function parsePolicy()

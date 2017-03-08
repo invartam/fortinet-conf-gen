@@ -85,6 +85,7 @@ class Main {
     $vars = self::loadVars($argv[3]);
     self::registerSchoolSubnets($siteList, $importedConf->getFortigate());
     self::registerSchoolServers($siteList, $importedConf->getFortigate());
+    $importedConf->parsePolicyTemplate("rectorat", $vars, "FLUX RECTORAT");
     $importedConf->parsePolicyTemplate("college", $vars, "FLUX COLLEGES");
 
     print $importedConf->getFortigate();
