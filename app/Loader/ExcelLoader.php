@@ -8,6 +8,8 @@ use Fortinet\Fortigate\VPN;
 use Fortinet\Fortigate\VIP;
 use Fortinet\Fortigate\IPPool;
 use Fortinet\Fortigate\Route;
+use Fortinet\Fortigate\BGP;
+use Fortinet\Fortigate\BGPNeighbor;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
 use Fortinet\Fortigate\Service;
@@ -29,6 +31,7 @@ class ExcelLoader {
   const TAB_VIP = "VIP";
   const TAB_IPPOOL = "IP Pool";
   const TAB_ROUTES = "Routage Statique";
+  const TAB_BGP = "Routage BGP";
 
   private $source;
   private $fortigate;
@@ -46,6 +49,7 @@ class ExcelLoader {
     $this->parseInterfaces();
     $this->parseVPN();
     $this->parseStaticRoute();
+    $this->parseBGP();
     $this->parseVIP();
     $this->parseIPPool();
     $this->parseAddress();
@@ -131,6 +135,27 @@ class ExcelLoader {
       $if->addAccess(NetDevice::ACCESS_PING);
       $this->fortigate->addNetDevice($if);
     }
+  }
+
+  private function parseBGP()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_BGP);
+    $routerId = $sheet->getCell("B3")->getValue();
+    $as = $sheet->getCell("C3")->getValue();
+    $bgp = new BGP($routerId, $as);
+    foreach ($sheet->getRowIterator(6) as $row) {
+      $peerId = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $remoteAs = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $password = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      if (empty($peerId)) {
+        break;
+      }
+      if (array_key_exists($peerId, $bgp->getNeighbors())) {
+        throw new Exception("Duplicate BGP PeerID $peerId at row " . $row->getRowIndex(), 1);
+      }
+      $bgp->addNeighbor(new BGPNeighbor($peerId, $remoteAs, $password));
+    }
+    $this->fortigate->setBGP($bgp);
   }
 
   private function parseVPN()

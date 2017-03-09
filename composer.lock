@@ -13,7 +13,7 @@
             "source": {
                 "type": "git",
                 "url": "https://gogs.benjy.lu/benjy/fortinet-php.git",
-                "reference": "09b8464a1422ef39609cd7b502c3b6c1aaaa5ef1"
+                "reference": "7d6a125f0ba0794d4689615445ed31a654378468"
             },
             "require-dev": {
                 "phpunit/phpunit": "5.7.*"
@@ -37,7 +37,7 @@
                 }
             ],
             "description": "Fortinet PHP library",
-            "time": "2017-03-08 15:08:45"
+            "time": "2017-03-09 13:21:38"
         },
         {
             "name": "phpoffice/phpspreadsheet",
@@ -1336,16 +1336,16 @@
         },
         {
             "name": "symfony/yaml",
-            "version": "v3.2.4",
+            "version": "v3.2.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/yaml.git",
-                "reference": "9724c684646fcb5387d579b4bfaa63ee0b0c64c8"
+                "reference": "093e416ad096355149e265ea2e4cc1f9ee40ab1a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/symfony/yaml/zipball/9724c684646fcb5387d579b4bfaa63ee0b0c64c8",
-                "reference": "9724c684646fcb5387d579b4bfaa63ee0b0c64c8",
+                "url": "https://api.github.com/repos/symfony/yaml/zipball/093e416ad096355149e265ea2e4cc1f9ee40ab1a",
+                "reference": "093e416ad096355149e265ea2e4cc1f9ee40ab1a",
                 "shasum": ""
             },
             "require": {
@@ -1387,7 +1387,7 @@
             ],
             "description": "Symfony Yaml Component",
             "homepage": "https://symfony.com",
-            "time": "2017-02-16 22:46:52"
+            "time": "2017-03-07 16:47:02"
         },
         {
             "name": "webmozart/assert",
