@@ -13,7 +13,7 @@
             "source": {
                 "type": "git",
                 "url": "https://gogs.benjy.lu/benjy/fortinet-php.git",
-                "reference": "7d6a125f0ba0794d4689615445ed31a654378468"
+                "reference": "1f1dfeffefbffc5e144a53d4272bfeaa1ff99265"
             },
             "require-dev": {
                 "phpunit/phpunit": "5.7.*"
@@ -37,7 +37,7 @@
                 }
             ],
             "description": "Fortinet PHP library",
-            "time": "2017-03-09 13:21:38"
+            "time": "2017-03-16 09:22:34"
         },
         {
             "name": "phpoffice/phpspreadsheet",
@@ -682,16 +682,16 @@
         },
         {
             "name": "phpunit/phpunit",
-            "version": "5.7.15",
+            "version": "5.7.16",
             "source": {
                 "type": "git",
                 "url": "https://github.com/sebastianbergmann/phpunit.git",
-                "reference": "b99112aecc01f62acf3d81a3f59646700a1849e5"
+                "reference": "dafc78e2a7d12139b0e97078d1082326bd09363d"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/b99112aecc01f62acf3d81a3f59646700a1849e5",
-                "reference": "b99112aecc01f62acf3d81a3f59646700a1849e5",
+                "url": "https://api.github.com/repos/sebastianbergmann/phpunit/zipball/dafc78e2a7d12139b0e97078d1082326bd09363d",
+                "reference": "dafc78e2a7d12139b0e97078d1082326bd09363d",
                 "shasum": ""
             },
             "require": {
@@ -760,7 +760,7 @@
                 "testing",
                 "xunit"
             ],
-            "time": "2017-03-02 15:22:43"
+            "time": "2017-03-15 13:02:34"
         },
         {
             "name": "phpunit/phpunit-mock-objects",
@@ -1336,7 +1336,7 @@
         },
         {
             "name": "symfony/yaml",
-            "version": "v3.2.5",
+            "version": "v3.2.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/yaml.git",
