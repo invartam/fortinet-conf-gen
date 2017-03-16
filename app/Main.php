@@ -22,7 +22,7 @@ class Main {
   public static function run($argv, $argc)
   {
     if ($argc != 1) {
-      print("Usage: $argv[0] <excel conf file>");
+      print("Usage: $argv[0] <excel conf file>\n");
       exit;
     }
     $importedConf = new ExcelLoader($argv[1]);

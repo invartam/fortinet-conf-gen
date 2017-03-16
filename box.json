@@ -1,0 +1,15 @@
+{
+    "directories": [
+        "app"
+    ],
+    "finder": [
+        {
+            "name": "*.php",
+            "in": "vendor"
+        }
+    ],
+    "chmod": "0755",
+    "main": "fortinet-conf-gen.php",
+    "output": "fortinet-conf-gen.phar",
+    "stub": true
+}
