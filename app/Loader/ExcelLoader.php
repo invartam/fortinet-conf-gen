@@ -4,7 +4,14 @@ namespace App\Loader;
 use Exception;
 use Fortinet\Fortigate\Fortigate;
 use Fortinet\Fortigate\NetDevice;
-use Fortinet\Fortigate\VPN;
+use Fortinet\Fortigate\VPN\IPSec\IPSec;
+use Fortinet\Fortigate\VPN\IPSec\Phase1;
+use Fortinet\Fortigate\VPN\IPSec\Phase2;
+use Fortinet\Fortigate\VIP;
+use Fortinet\Fortigate\IPPool;
+use Fortinet\Fortigate\Route;
+use Fortinet\Fortigate\BGP;
+use Fortinet\Fortigate\BGPNeighbor;
 use Fortinet\Fortigate\Address;
 use Fortinet\Fortigate\AddressGroup;
 use Fortinet\Fortigate\Service;
@@ -22,7 +29,11 @@ class ExcelLoader {
   const TAB_SERVICE = "Services";
   const TAB_SERVICEGROUP = "ServicesGroup";
   const TAB_POLICY = "Policies";
-  const TAB_VPN = "VPN IPSec";
+  const TAB_IPSEC = "VPN IPSec";
+  const TAB_VIP = "VIP";
+  const TAB_IPPOOL = "IP Pool";
+  const TAB_ROUTES = "Routage Statique";
+  const TAB_BGP = "Routage BGP";
 
   private $source;
   private $fortigate;
@@ -38,7 +49,11 @@ class ExcelLoader {
 
     // $this->getInfos();
     $this->parseInterfaces();
-    $this->parseVPN();
+    $this->parseIPSec();
+    $this->parseStaticRoute();
+    $this->parseBGP();
+    $this->parseVIP();
+    $this->parseIPPool();
     $this->parseAddress();
     $this->parseAddressGroup();
     $this->parseService();
@@ -119,22 +134,108 @@ class ExcelLoader {
       if (!empty($zone)) {
         $this->fortigate->zones[$zone]->addInterface($if);
       }
+      $if->addAccess(NetDevice::ACCESS_PING);
       $this->fortigate->addNetDevice($if);
     }
   }
 
-  private function parseVPN()
+  private function parseBGP()
   {
-    $sheet = $this->source->getSheetByName(self::TAB_VPN);
-    foreach ($sheet->getRowIterator(3) as $row) {
+    $sheet = $this->source->getSheetByName(self::TAB_BGP);
+    $routerId = $sheet->getCell("B3")->getValue();
+    $as = $sheet->getCell("C3")->getValue();
+    $bgp = new BGP($routerId, $as);
+    foreach ($sheet->getRowIterator(6) as $row) {
+      $peerId = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $remoteAs = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $password = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      if (empty($peerId)) {
+        break;
+      }
+      if (array_key_exists($peerId, $bgp->getNeighbors())) {
+        throw new Exception("Duplicate BGP PeerID $peerId at row " . $row->getRowIndex(), 1);
+      }
+      $bgp->addNeighbor(new BGPNeighbor($peerId, $remoteAs, $password));
+    }
+    $this->fortigate->setBGP($bgp);
+  }
+
+  private function parseIPSec()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_IPSEC);
+    foreach ($sheet->getRowIterator(4) as $row) {
       $name = trim($row->getCellIterator()->seek("B")->current()->getValue());
       if (empty($name)) {
         break;
       }
-      if (array_key_exists($name, $this->fortigate->VPNs)) {
-        throw new Exception("Duplicate VPN $name at row " . $row->getRowIndex(), 1);
+      if (array_key_exists($name, $this->fortigate->IPSecVPNs)) {
+        throw new Exception("Duplicate IPSec $name at row " . $row->getRowIndex(), 1);
       }
-      $this->fortigate->addVPN(new VPN($name));
+      // Phase 1 configuration
+      $remote = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $if = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      $psk = trim($row->getCellIterator()->seek("E")->current()->getValue());
+      $ikeversion = trim($row->getCellIterator()->seek("F")->current()->getValue());
+      $auth = trim($row->getCellIterator()->seek("G")->current()->getValue());
+      $enc = trim($row->getCellIterator()->seek("H")->current()->getValue());
+      $dhgrp = trim($row->getCellIterator()->seek("I")->current()->getValue());
+      $keylife = trim($row->getCellIterator()->seek("J")->current()->getValue());
+      $localid = trim($row->getCellIterator()->seek("K")->current()->getValue());
+      if (!array_key_exists($if, $this->fortigate->interfaces)) {
+        throw new Exception("Interface $if does not exist", 1);
+      }
+      $p1 = new Phase1($name, $this->fortigate->interfaces[$if], $remote, $psk, "disable", $ikeversion, $auth, $enc, $dhgrp, $keylife);
+
+      // Phase 2 configuration
+      $auth = trim($row->getCellIterator()->seek("L")->current()->getValue());
+      $enc = trim($row->getCellIterator()->seek("M")->current()->getValue());
+      $antireplay = trim($row->getCellIterator()->seek("N")->current()->getValue());
+      $dhgrp = trim($row->getCellIterator()->seek("O")->current()->getValue());
+      $left = trim($row->getCellIterator()->seek("P")->current()->getValue());
+      $right = trim($row->getCellIterator()->seek("Q")->current()->getValue());
+      $keylife = trim($row->getCellIterator()->seek("R")->current()->getValue());
+      $p2 = new Phase2($p1, $left, $right, $enc, $auth, $dhgrp, $keylife);
+
+      $this->fortigate->addIPSecVPN(new IPSec($p1, $p2));
+    }
+  }
+
+  private function parseVIP()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_VIP);
+    foreach ($sheet->getRowIterator(3) as $row) {
+      $name = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $extip = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $intip = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      $if = trim($row->getCellIterator()->seek("E")->current()->getValue());
+      if (empty($name) || empty($extip) || empty($intip) || empty($if)) {
+        break;
+      }
+      if (array_key_exists($name, $this->fortigate->VIPs)) {
+        throw new Exception("Duplicate VIP $name at row " . $row->getRowIndex(), 1);
+      }
+      if (!array_key_exists($if, $this->fortigate->interfaces)) {
+        throw new Exception("Interface $if does not exists at row " . $row->getRowIndex(), 1);
+      }
+      $this->fortigate->addVIP(new VIP($name, $extip, $intip, $this->fortigate->interfaces[$if]));
+    }
+  }
+
+  private function parseIPPool()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_IPPOOL);
+    foreach ($sheet->getRowIterator(3) as $row) {
+      $name = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $type = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $ipl = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      $iph = trim($row->getCellIterator()->seek("E")->current()->getValue());
+      if (empty($name) || empty($type) || empty($ipl)) {
+        break;
+      }
+      if (array_key_exists($name, $this->fortigate->IPPools)) {
+        throw new Exception("Duplicate IP Pool $name at row " . $row->getRowIndex(), 1);
+      }
+      $this->fortigate->addIPPool(new IPPool($name, $type, $ipl, $iph));
     }
   }
 
@@ -186,7 +287,7 @@ class ExcelLoader {
         break;
       }
       $l4proto = "";
-      $l3proto = Service::PROTO_IP;;
+      $l3proto = Service::PROTO_L4;
       if ($proto == "UDP") {
         $l4proto = Service::L4_UDP;
       }
@@ -268,16 +369,17 @@ class ExcelLoader {
   private function addPolicy($row, $vars = [])
   {
     $ignore = trim($row->getCellIterator()->seek("B")->current()->getValue());
-    $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("C")->current()->getValue(), $vars));
-    $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
-    $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
-    $destinationAddress = trim($this->parseVar($row->getCellIterator()->seek("F")->current()->getValue(), $vars));
-    $service = trim($this->parseVar($row->getCellIterator()->seek("G")->current()->getValue(), $vars));
-    $action = trim($row->getCellIterator()->seek("H")->current()->getValue());
-    $log = trim($row->getCellIterator()->seek("I")->current()->getValue());
-    $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
-    $nat = trim($row->getCellIterator()->seek("K")->current()->getValue());
-    $desc = trim($row->getCellIterator()->seek("L")->current()->getValue());
+    $name = trim($row->getCellIterator()->seek("C")->current()->getValue());
+    $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
+    $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
+    $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("F")->current()->getValue(), $vars));
+    $destinationAddress = trim($this->parseVar($row->getCellIterator()->seek("G")->current()->getValue(), $vars));
+    $service = trim($this->parseVar($row->getCellIterator()->seek("H")->current()->getValue(), $vars));
+    $action = trim($row->getCellIterator()->seek("I")->current()->getValue());
+    $log = trim($row->getCellIterator()->seek("J")->current()->getValue());
+    $user = trim($row->getCellIterator()->seek("K")->current()->getValue());
+    $nat = trim($row->getCellIterator()->seek("L")->current()->getValue());
+    $desc = trim($row->getCellIterator()->seek("M")->current()->getValue());
     if (!is_numeric($ignore) && empty($sourceZone)) {
       $this->policySection = $ignore;
       return;
@@ -301,8 +403,8 @@ class ExcelLoader {
       elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
         $policy->addSrcInterface($this->fortigate->interfaces[$zone]);
       }
-      elseif (array_key_exists($zone, $this->fortigate->VPNs)) {
-        $policy->addSrcInterface($this->fortigate->VPNs[$zone]);
+      elseif (array_key_exists($zone, $this->fortigate->IPSecVPNs)) {
+        $policy->addSrcInterface($this->fortigate->IPSecVPNs[$zone]);
       }
       else {
         throw new Exception("Source zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
@@ -318,8 +420,8 @@ class ExcelLoader {
       elseif (array_key_exists($zone, $this->fortigate->interfaces)) {
         $policy->addDstInterface($this->fortigate->interfaces[$zone]);
       }
-      elseif (array_key_exists($zone, $this->fortigate->VPNs)) {
-        $policy->addDstInterface($this->fortigate->VPNs[$zone]);
+      elseif (array_key_exists($zone, $this->fortigate->IPSecVPNs)) {
+        $policy->addDstInterface($this->fortigate->IPSecVPNs[$zone]);
       }
       else {
         throw new Exception("Destination zone or interface $zone does not exist at row " . $row->getRowIndex(), 1);
@@ -336,6 +438,9 @@ class ExcelLoader {
         elseif (array_key_exists($address, $this->fortigate->addresses)) {
           $policy->addSrcAddress($this->fortigate->addresses[$address]);
         }
+        elseif (array_key_exists($address, $this->fortigate->VIPs)) {
+          $policy->addSrcAddress($this->fortigate->VIPs[$address]);
+        }
         else {
           throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
         }
@@ -351,6 +456,9 @@ class ExcelLoader {
         }
         elseif (array_key_exists($address, $this->fortigate->addresses)) {
           $policy->addDstAddress($this->fortigate->addresses[$address]);
+        }
+        elseif (array_key_exists($address, $this->fortigate->VIPs)) {
+          $policy->addDstAddress($this->fortigate->VIPs[$address]);
         }
         else {
           throw new Exception("Source address or address group $address does not exist at row " . $row->getRowIndex(), 1);
@@ -380,10 +488,34 @@ class ExcelLoader {
       $policy->setAction("deny");
     }
     if (!empty($nat)) {
-      $policy->doNat();
+      if (in_array($nat, $this->fortigate->IPPools)) {
+        $policy->doNat($this->fortigate->IPPools[$nat]);
+      }
+      else {
+        $policy->doNat();
+      }
     }
     $policy->setGlobalLabel($this->policySection);
     $this->fortigate->addPolicy($policy);
+  }
+
+  private function parseStaticRoute()
+  {
+    $sheet = $this->source->getSheetByName(self::TAB_ROUTES);
+    foreach ($sheet->getRowIterator(4) as $row) {
+      $ip = trim($row->getCellIterator()->seek("B")->current()->getValue());
+      $mask = trim($row->getCellIterator()->seek("C")->current()->getValue());
+      $gw = trim($row->getCellIterator()->seek("D")->current()->getValue());
+      $if = trim($row->getCellIterator()->seek("E")->current()->getValue());
+      if (empty($ip) || empty($mask)) {
+        break;
+      }
+      if (!array_key_exists($if, $this->fortigate->interfaces)
+          && !array_key_exists($if, $this->fortigate->IPSecVPNs)) {
+        throw new Exception("Interface $if non existent at row " . $row->getRowIndex(), 1);
+      }
+      $this->fortigate->addRoute(new Route($ip, $mask, $if, $gw));
+    }
   }
 
   private function parsePolicy()
