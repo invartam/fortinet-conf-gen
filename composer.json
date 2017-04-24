@@ -22,7 +22,7 @@
           "Tests\\": "tests/"
         },
         "psr-4": {
-            "App\\": "app/"
+          "Fortinet\\ConfGenerator\\": "src/"
         }
     },
     "require-dev": {

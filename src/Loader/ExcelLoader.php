@@ -1,5 +1,5 @@
 <?php
-namespace App\Loader;
+namespace Fortinet\ConfGenerator\Loader;
 
 use Exception;
 use Fortinet\Fortigate\Fortigate;
