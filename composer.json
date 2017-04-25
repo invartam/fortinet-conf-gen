@@ -10,7 +10,7 @@
       },
       {
           "type": "vcs",
-          "url": "https://gogs.benjy.lu/benjy/fortinet-php.git"
+          "url": "https://github.com/invartam/fortinet-conf-gen.git"
       }
     ],
     "require": {
