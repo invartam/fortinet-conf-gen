@@ -369,17 +369,17 @@ class ExcelLoader {
   private function addPolicy($row, $vars = [])
   {
     $ignore = trim($row->getCellIterator()->seek("B")->current()->getValue());
-    $name = trim($row->getCellIterator()->seek("C")->current()->getValue());
-    $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
-    $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
-    $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("F")->current()->getValue(), $vars));
-    $destinationAddress = trim($this->parseVar($row->getCellIterator()->seek("G")->current()->getValue(), $vars));
-    $service = trim($this->parseVar($row->getCellIterator()->seek("H")->current()->getValue(), $vars));
-    $action = trim($row->getCellIterator()->seek("I")->current()->getValue());
-    $log = trim($row->getCellIterator()->seek("J")->current()->getValue());
-    $user = trim($row->getCellIterator()->seek("K")->current()->getValue());
-    $nat = trim($row->getCellIterator()->seek("L")->current()->getValue());
-    $desc = trim($row->getCellIterator()->seek("M")->current()->getValue());
+    //$name = trim($row->getCellIterator()->seek("C")->current()->getValue());
+    $sourceZone = trim($this->parseVar($row->getCellIterator()->seek("C")->current()->getValue(), $vars));
+    $destinationZone = trim($this->parseVar($row->getCellIterator()->seek("D")->current()->getValue(), $vars));
+    $sourceAddress = trim($this->parseVar($row->getCellIterator()->seek("E")->current()->getValue(), $vars));
+    $destinationAddress = trim($this->parseVar($row->getCellIterator()->seek("F")->current()->getValue(), $vars));
+    $service = trim($this->parseVar($row->getCellIterator()->seek("G")->current()->getValue(), $vars));
+    $action = trim($row->getCellIterator()->seek("H")->current()->getValue());
+    $log = trim($row->getCellIterator()->seek("I")->current()->getValue());
+    $user = trim($row->getCellIterator()->seek("J")->current()->getValue());
+    $nat = trim($row->getCellIterator()->seek("K")->current()->getValue());
+    $desc = trim($row->getCellIterator()->seek("L")->current()->getValue());
     if (!is_numeric($ignore) && empty($sourceZone)) {
       $this->policySection = $ignore;
       return;
